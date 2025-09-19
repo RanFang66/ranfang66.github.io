@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 7.3.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon/favicon-32x32.png">
+  <link rel="mask-icon" href="/images/favicon/favicon.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"ranfang66.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.25.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":false,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="问题来源由于在项目中需要用到E2PROM来保存一个浮点型数据，E2PROM读写的驱动都是按照字节来读写的，所以需要将float数据类型转换为字节序列，再写入E2。同理读取float数据时也要先读出字节序列，然后转换为float类型数据。 原程序开始编写时图代码简单，直接使用指针强制类型转换的方式，代码如下：">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C2000 DSP 踩坑记录：float与字节转换">
+<meta property="og:url" content="htttps://ranfang66.github.io/2022/12/24/The-Trans-between-float-and-char-type-in-C2000-DSP/index.html">
+<meta property="og:site_name" content="KissFire">
+<meta property="og:description" content="问题来源由于在项目中需要用到E2PROM来保存一个浮点型数据，E2PROM读写的驱动都是按照字节来读写的，所以需要将float数据类型转换为字节序列，再写入E2。同理读取float数据时也要先读出字节序列，然后转换为float类型数据。 原程序开始编写时图代码简单，直接使用指针强制类型转换的方式，代码如下：">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="htttps://ranfang66.github.io/2022/12/24/The-Trans-between-float-and-char-type-in-C2000-DSP/image-res.png">
+<meta property="og:image" content="htttps://ranfang66.github.io/2022/12/24/The-Trans-between-float-and-char-type-in-C2000-DSP/image-res.png">
+<meta property="article:published_time" content="2022-12-24T02:50:32.000Z">
+<meta property="article:modified_time" content="2025-09-19T03:20:38.689Z">
+<meta property="article:author" content="Ran">
+<meta property="article:tag" content="embeded software">
+<meta property="article:tag" content="DSP">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="htttps://ranfang66.github.io/2022/12/24/The-Trans-between-float-and-char-type-in-C2000-DSP/image-res.png">
+
+
+<link rel="canonical" href="htttps://ranfang66.github.io/2022/12/24/The-Trans-between-float-and-char-type-in-C2000-DSP/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"en","comments":true,"permalink":"htttps://ranfang66.github.io/2022/12/24/The-Trans-between-float-and-char-type-in-C2000-DSP/","path":"2022/12/24/The-Trans-between-float-and-char-type-in-C2000-DSP/","title":"C2000 DSP 踩坑记录：float与字节转换"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>C2000 DSP 踩坑记录：float与字节转换 | KissFire</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">KissFire</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">A blog to record daily life and share development notes.</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="Search" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a></li><li class="menu-item menu-item-cv"><a href="/cv/" rel="section"><i class="fa fa-file fa-fw"></i>cv</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%97%AE%E9%A2%98%E6%9D%A5%E6%BA%90"><span class="nav-number">1.</span> <span class="nav-text">问题来源</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%9F%E7%A8%8B%E5%BA%8F"><span class="nav-number">2.</span> <span class="nav-text">原程序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%97%AE%E9%A2%98%E7%8E%B0%E8%B1%A1%E4%B8%8E%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.</span> <span class="nav-text">问题现象与原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BF%AE%E6%94%B9%E7%A8%8B%E5%BA%8F"><span class="nav-number">4.</span> <span class="nav-text">修改程序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">5.</span> <span class="nav-text">总结</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ran"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">Ran</p>
+  <div class="site-description" itemprop="description">A personal blog to record daily life and share development notes.</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">6</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/ranfang66" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;ranfang66" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:ranfang66@gmail.com" title="E-Mail → mailto:ranfang66@gmail.com" rel="noopener me" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/FireOnMe1" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;FireOnMe1" rel="noopener me" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/id=100075973842339" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;id&#x3D;100075973842339" rel="noopener me" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://instagram.com/frankraven9" title="Instagram → https:&#x2F;&#x2F;instagram.com&#x2F;frankraven9" rel="noopener me" target="_blank"><i class="fab fa-instagram fa-fw"></i>Instagram</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="en">
+    <link itemprop="mainEntityOfPage" href="htttps://ranfang66.github.io/2022/12/24/The-Trans-between-float-and-char-type-in-C2000-DSP/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="Ran">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KissFire">
+      <meta itemprop="description" content="A personal blog to record daily life and share development notes.">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="C2000 DSP 踩坑记录：float与字节转换 | KissFire">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          C2000 DSP 踩坑记录：float与字节转换
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">Posted on</span>
+
+      <time title="Created: 2022/12/24 10:50:32" itemprop="dateCreated datePublished" datetime="2022-12-24T10:50:32+08:00">2022/12/24</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">Edited on</span>
+      <time title="Modified: 2025/09/19 11:20:38" itemprop="dateModified" datetime="2025-09-19T11:20:38+08:00">2025/09/19</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">In</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Development/" itemprop="url" rel="index"><span itemprop="name">Development</span></a>
+        </span>
+          , 
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Development/Debug/" itemprop="url" rel="index"><span itemprop="name">Debug</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><h2 id="问题来源"><a href="#问题来源" class="headerlink" title="问题来源"></a>问题来源</h2><p>由于在项目中需要用到E2PROM来保存一个浮点型数据，E2PROM读写的驱动都是按照字节来读写的，所以需要将float数据类型转换为字节序列，再写入E2。同理读取float数据时也要先读出字节序列，然后转换为float类型数据。</p>
+<h2 id="原程序"><a href="#原程序" class="headerlink" title="原程序"></a>原程序</h2><p>开始编写时图代码简单，直接使用指针强制类型转换的方式，代码如下：</p>
+<span id="more"></span>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">// float 类型转换为字符数组</span></span><br><span class="line"><span class="type">void</span></span><br><span class="line"><span class="title function_">float_2_byte</span><span class="params">(<span class="type">float</span> f, <span class="type">unsigned</span> <span class="type">char</span> *s)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">unsigned</span> <span class="type">char</span> *byte;</span><br><span class="line">    <span class="type">int</span> i = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    byte = (<span class="type">unsigned</span> <span class="type">char</span>*)&amp;f;</span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; <span class="number">4</span>; i++) &#123;</span><br><span class="line">        *(s+i) = *(byte+i);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 字符数组转换为float类型</span></span><br><span class="line"><span class="type">float</span></span><br><span class="line"><span class="title function_">byte_2_float</span><span class="params">(<span class="type">unsigned</span> <span class="type">char</span> *s)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">float</span> *fp;</span><br><span class="line"></span><br><span class="line">    fp = (<span class="type">float</span>*)s;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> *fp;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 测试程序</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">float</span> f = <span class="number">3.141582657</span>;</span><br><span class="line">    <span class="type">float</span> f2 = <span class="number">0.0</span>;</span><br><span class="line">    <span class="type">unsigned</span> <span class="type">char</span> s[<span class="number">4</span>];</span><br><span class="line"></span><br><span class="line">    float_2_byte(f, s);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%x\t%x\t%x\t%x\n&quot;</span>, s[<span class="number">0</span>], s[<span class="number">1</span>], s[<span class="number">2</span>], s[<span class="number">3</span>]);</span><br><span class="line"></span><br><span class="line">    f2 = byte_2_float(s);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;float = %f\n&quot;</span>, f2);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>将上述代码再PC上测试了一下，输出结果如下：</p>
+<p><img src="/2022/12/24/The-Trans-between-float-and-char-type-in-C2000-DSP/image-res.png" alt="PC Result"></p>
+<!-- <img src="/2022/12/24/The-Trans-between-float-and-char-type-in-C2000-DSP/image-res.png" class="" title="The Result in PC"> -->
+
+<p>说明字节序和float类型之间的相互转换没有问题。</p>
+<h2 id="问题现象与原因"><a href="#问题现象与原因" class="headerlink" title="问题现象与原因"></a>问题现象与原因</h2><p>将上述程序移植到28335平台时，通过E2读写数据时，发现读出的数据与写入的不同。经过调试发现，实际写入的数据并没有按照预想的那样写入float型数据的各个字节。</p>
+<p>原因分析：dsp28335的最小数据类型单位是16位的，28335平台上的unsigned char类型实际上是16位！当采用如上代码运行在28335平台上，将一个float类型数据0x12345678转换为unsigned char类型数组时，实际上得到的unsigned char类型数组为：</p>
+<p>s[0] &#x3D; 0x5678, s[1] &#x3D; 0x1234, s[2] &#x3D; 0x????, s[3] &#x3D; 0x????。也就是说，直接采用unsigned char类型指针运算的方式，指针加1并不是移动8位，而是16位，因此采用指针去取字节出现了错误。</p>
+<h2 id="修改程序"><a href="#修改程序" class="headerlink" title="修改程序"></a>修改程序</h2><p>采用指针进行暴力类型转换的方法在28335上行不通了。还可以采用位运算或者联合体的方式。这里直接采用位运算和类型转换的方式。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdint.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span></span><br><span class="line"><span class="title function_">float_2_byte</span><span class="params">(<span class="type">float</span> f, <span class="type">unsigned</span> <span class="type">char</span> *s)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">uint32_t</span> longdata = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    longdata = *(<span class="type">uint32_t</span>*)&amp;f;</span><br><span class="line"></span><br><span class="line">    s[<span class="number">0</span>] = (longdata &amp; <span class="number">0xFF000000</span>) &gt;&gt; <span class="number">24</span>;</span><br><span class="line">    s[<span class="number">1</span>] = (longdata &amp; <span class="number">0x00FF0000</span>) &gt;&gt; <span class="number">16</span>;</span><br><span class="line">    s[<span class="number">2</span>] = (longdata &amp; <span class="number">0x0000FF00</span>) &gt;&gt; <span class="number">8</span>;</span><br><span class="line">    s[<span class="number">3</span>] = (longdata &amp; <span class="number">0x000000FF</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">float</span></span><br><span class="line"><span class="title function_">byte_2_float</span><span class="params">(<span class="type">unsigned</span> <span class="type">char</span> *s)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">uint32_t</span> longdata = <span class="number">0</span>;</span><br><span class="line">    <span class="type">float</span> f = <span class="number">0.0</span>;</span><br><span class="line">	<span class="type">int</span> i = <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; <span class="number">3</span>; i++) &#123;</span><br><span class="line">        longdata += s[i];</span><br><span class="line">        longdata &lt;&lt;= <span class="number">8</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    longdata += s[<span class="number">3</span>];</span><br><span class="line">    </span><br><span class="line">    f = *(<span class="type">float</span>*)&amp;longdata;</span><br><span class="line">    <span class="keyword">return</span> f;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">float</span> f = <span class="number">3.1415</span>;</span><br><span class="line">    <span class="type">float</span> f2 = <span class="number">0.0</span>;</span><br><span class="line">    <span class="type">unsigned</span> <span class="type">char</span> s[<span class="number">4</span>];</span><br><span class="line"></span><br><span class="line">    float_2_byte(f, s);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%x\t%x\t%x\t%x\n&quot;</span>, s[<span class="number">0</span>], s[<span class="number">1</span>], s[<span class="number">2</span>], s[<span class="number">3</span>]);</span><br><span class="line"></span><br><span class="line">    f2 = byte_2_float(s);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;float = %f\n&quot;</span>, f2);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>上述代码在移植到DSP28335平台之后，能够正确的实现float类型数据和字节序列之间的转换。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>之所以源程序在PC上没问题，而在DSP28335平台上出现bug的原因在于对于unsigned char类型的指针操作。在DSP28335上对于8位数据的指针操作与预想的是不同的，因为DSP28335中实际上是以16位的形式存储char和unsigned char类型数据。在对8位数据指针类型进行加减操作时，指针移动也是16位而不是8位。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/embeded-software/" rel="tag"># embeded software</a>
+              <a href="/tags/DSP/" rel="tag"># DSP</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/09/29/Cpp-Learning-Notes-Template/" rel="prev" title="Cpp Learning Notes-Template">
+                  <i class="fa fa-angle-left"></i> Cpp Learning Notes-Template
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/01/19/Virtual-Keyboard-in-Qt5/" rel="next" title="树莓派qt5使用虚拟键盘配置">
+                  树莓派qt5使用虚拟键盘配置 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2025</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Ran</span>
+  </div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="Back to top">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+  <a href="https://github.com/ranfang66" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

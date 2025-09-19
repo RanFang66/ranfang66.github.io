@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 7.3.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon/favicon-32x32.png">
+  <link rel="mask-icon" href="/images/favicon/favicon.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"ranfang66.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.25.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":false,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="功能需求最近项目中需要在嵌入式Linux系统中直接控制步进电机，需要开发Linux系统下的步进电机驱动，实现控制步进电机向前，向后运动指定步数的驱动API接口。每个步进电机有三个硬件接口，一个使能IO口通过电平控制步进电机的使能， 一个方向控制IO口通过电平控制步进电机的运动方向，一个PWM驱动接口驱动电机运动。在项目中的设备需要同时控制多个步进电机，因此开发的驱动也需要支持多个步进电机设备同时挂">
+<meta property="og:type" content="article">
+<meta property="og:title" content="linux下步进电机驱动开发">
+<meta property="og:url" content="htttps://ranfang66.github.io/2023/03/23/Stepper-Motor-Driver-Development-in-Linux-System/index.html">
+<meta property="og:site_name" content="KissFire">
+<meta property="og:description" content="功能需求最近项目中需要在嵌入式Linux系统中直接控制步进电机，需要开发Linux系统下的步进电机驱动，实现控制步进电机向前，向后运动指定步数的驱动API接口。每个步进电机有三个硬件接口，一个使能IO口通过电平控制步进电机的使能， 一个方向控制IO口通过电平控制步进电机的运动方向，一个PWM驱动接口驱动电机运动。在项目中的设备需要同时控制多个步进电机，因此开发的驱动也需要支持多个步进电机设备同时挂">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2023-03-23T02:24:48.000Z">
+<meta property="article:modified_time" content="2025-09-19T03:21:08.098Z">
+<meta property="article:author" content="Ran">
+<meta property="article:tag" content="Embeded software">
+<meta property="article:tag" content="Linux Driver">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="htttps://ranfang66.github.io/2023/03/23/Stepper-Motor-Driver-Development-in-Linux-System/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"en","comments":true,"permalink":"htttps://ranfang66.github.io/2023/03/23/Stepper-Motor-Driver-Development-in-Linux-System/","path":"2023/03/23/Stepper-Motor-Driver-Development-in-Linux-System/","title":"linux下步进电机驱动开发"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>linux下步进电机驱动开发 | KissFire</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">KissFire</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">A blog to record daily life and share development notes.</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="Search" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a></li><li class="menu-item menu-item-cv"><a href="/cv/" rel="section"><i class="fa fa-file fa-fw"></i>cv</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8A%9F%E8%83%BD%E9%9C%80%E6%B1%82"><span class="nav-number">1.</span> <span class="nav-text">功能需求</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E6%9E%90"><span class="nav-number">2.</span> <span class="nav-text">分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%BE%E5%A4%87%E6%A0%91%E6%96%87%E4%BB%B6%E7%9A%84%E7%BC%96%E5%86%99"><span class="nav-number">3.</span> <span class="nav-text">设备树文件的编写</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#platform%E8%AE%BE%E5%A4%87probe%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">4.</span> <span class="nav-text">platform设备probe函数的实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%AD%A5%E8%BF%9B%E7%94%B5%E6%9C%BA%E5%AD%97%E7%AC%A6%E8%AE%BE%E5%A4%87%E6%96%87%E4%BB%B6%E6%93%8D%E4%BD%9C%E6%8E%A5%E5%8F%A3%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">5.</span> <span class="nav-text">步进电机字符设备文件操作接口的实现</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ran"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">Ran</p>
+  <div class="site-description" itemprop="description">A personal blog to record daily life and share development notes.</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">6</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/ranfang66" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;ranfang66" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:ranfang66@gmail.com" title="E-Mail → mailto:ranfang66@gmail.com" rel="noopener me" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/FireOnMe1" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;FireOnMe1" rel="noopener me" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/id=100075973842339" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;id&#x3D;100075973842339" rel="noopener me" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://instagram.com/frankraven9" title="Instagram → https:&#x2F;&#x2F;instagram.com&#x2F;frankraven9" rel="noopener me" target="_blank"><i class="fab fa-instagram fa-fw"></i>Instagram</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="en">
+    <link itemprop="mainEntityOfPage" href="htttps://ranfang66.github.io/2023/03/23/Stepper-Motor-Driver-Development-in-Linux-System/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="Ran">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KissFire">
+      <meta itemprop="description" content="A personal blog to record daily life and share development notes.">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="linux下步进电机驱动开发 | KissFire">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          linux下步进电机驱动开发
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">Posted on</span>
+
+      <time title="Created: 2023/03/23 10:24:48" itemprop="dateCreated datePublished" datetime="2023-03-23T10:24:48+08:00">2023/03/23</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">Edited on</span>
+      <time title="Modified: 2025/09/19 11:21:08" itemprop="dateModified" datetime="2025-09-19T11:21:08+08:00">2025/09/19</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">In</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Development/" itemprop="url" rel="index"><span itemprop="name">Development</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><h2 id="功能需求"><a href="#功能需求" class="headerlink" title="功能需求"></a>功能需求</h2><p>最近项目中需要在嵌入式Linux系统中直接控制步进电机，需要开发Linux系统下的步进电机驱动，实现控制步进电机向前，向后运动指定步数的驱动API接口。每个步进电机有三个硬件接口，一个使能IO口通过电平控制步进电机的使能， 一个方向控制IO口通过电平控制步进电机的运动方向，一个PWM驱动接口驱动电机运动。在项目中的设备需要同时控制多个步进电机，因此开发的驱动也需要支持多个步进电机设备同时挂载。</p>
+<h2 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h2><p>步进电机在Linux中属于字符设备，控制步进电机的运动(向前，或向后)和停止等API可以通过实现字符设备的文件操作函数来实现。这里选择实现文件操作中的ioctl函数，通过定义ioctl不同的命令来对应我们需要的不同操作。当然也可以通过字符设备文件的写函数write来实现，通过向步进电机的字符设备文件中写入相应的命令实现需要的操作。</p>
+<p>其次，针对驱动程序需要同时支持多个步进电机的需求，可以采用设备树加platform总线的形式。将步进电机挂载到platform总线上，通过platform的probe函数自动解析设备树文件，得到挂载的步进电机设备信息，从而根据设备树文件中的定义加载指定数量的驱动，配置好驱动需要用到的硬件资源。</p>
+<h2 id="设备树文件的编写"><a href="#设备树文件的编写" class="headerlink" title="设备树文件的编写"></a>设备树文件的编写</h2><p>前面提到了每个步进电机有三个硬件接口需要指定，其中包括1个使能GPIO口，1个方向GPIO口，1个PWM输出。这里PWM输出可以直接使用硬件PWM模块，也可以通过软件定时器去控制GPIO口实现模拟PWM功能。</p>
+<p>因此设备树文件中对于一个步进电机的定义如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">\ &#123;</span><br><span class="line">    stepper_motor &#123;</span><br><span class="line">        compatible = <span class="string">&quot;stepper-motor&quot;</span>;</span><br><span class="line">        status = <span class="string">&quot;okay&quot;</span>;</span><br><span class="line">        enable-gpio = &lt;&amp;gpio0 <span class="number">0</span> GPIO_ACTIVE_HIGH&gt;;</span><br><span class="line">        direction-gpio = &lt;&amp;gpio0 <span class="number">1</span> GPIO_ACTIVE_HIGH&gt;;</span><br><span class="line">        pwm = &lt;&amp;pwm0 <span class="number">0</span> <span class="number">1000000</span> <span class="number">0</span>&gt;;					<span class="comment">// 使用硬件PWM模块</span></span><br><span class="line">        <span class="comment">// pwm-gpio = &lt;&amp;gpio0 2 GPIO_ACTIVE_HIGH&gt;;	// 使用GPIO模拟PWM</span></span><br><span class="line">    &#125;；</span><br><span class="line">&#125;；</span><br></pre></td></tr></table></figure>
+
+<span id="more"></span>
+
+<p>考虑到要同时支持多个步进电机驱动，可以进一步将步进电机虚拟成一个总线设备，上面挂载多个步进电机设备子节点。例如同时挂载三个步进电机的设备树文件如下:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">\ &#123;</span><br><span class="line">    stepper_motor &#123;</span><br><span class="line">        compatible = <span class="string">&quot;stepper-motor&quot;</span>;</span><br><span class="line">		status = <span class="string">&quot;okay&quot;</span>;</span><br><span class="line">		<span class="meta">#address-cells = <span class="string">&lt;1&gt;</span>;</span></span><br><span class="line">		<span class="meta">#size-cells = <span class="string">&lt;0&gt;</span>;</span></span><br><span class="line">   		stepper_motor0@<span class="number">0</span> &#123;</span><br><span class="line">            enable-gpio = &lt;&amp;gpio0 <span class="number">0</span> GPIO_ACTIVE_HIGH&gt;;</span><br><span class="line">        	direction-gpio = &lt;&amp;gpio0 <span class="number">1</span> GPIO_ACTIVE_HIGH&gt;;</span><br><span class="line">        	pwm = &lt;&amp;pwm2 <span class="number">0</span> <span class="number">1000000</span> <span class="number">0</span>&gt;;	</span><br><span class="line">        &#125;;</span><br><span class="line">        stepper_motor1@<span class="number">1</span> &#123;</span><br><span class="line">            enable-gpio = &lt;&amp;gpio1 <span class="number">0</span> GPIO_ACTIVE_HIGH&gt;;</span><br><span class="line">        	direction-gpio = &lt;&amp;gpio1 <span class="number">1</span> GPIO_ACTIVE_HIGH&gt;;</span><br><span class="line">        	pwm = &lt;&amp;pwm2 <span class="number">0</span> <span class="number">1000000</span> <span class="number">0</span>&gt;;	</span><br><span class="line">        &#125;；</span><br><span class="line">        stepper_motor2@<span class="number">2</span> &#123;</span><br><span class="line">            enable-gpio = &lt;&amp;gpio2 <span class="number">0</span> GPIO_ACTIVE_HIGH&gt;;</span><br><span class="line">        	direction-gpio = &lt;&amp;gpio2 <span class="number">1</span> GPIO_ACTIVE_HIGH&gt;;</span><br><span class="line">        	pwm = &lt;&amp;pwm2 <span class="number">0</span> <span class="number">1000000</span> <span class="number">0</span>&gt;;	</span><br><span class="line">        &#125;;  </span><br><span class="line">    &#125;；</span><br><span class="line">&#125;；</span><br></pre></td></tr></table></figure>
+
+<p>在上面的设备树文件中，三个步进电机stepper_motor0,1,2作为stepper_motor节点下的3个子节点挂载到设备树中。这样就可以在stepper_motor的驱动程序中同时对设备树文件中定义的多个设备进行解析。上面写的GPIO口编号，PWM模块都是随便写的例子，使用时根据实际的硬件连接情况设置即可。</p>
+<h2 id="platform设备probe函数的实现"><a href="#platform设备probe函数的实现" class="headerlink" title="platform设备probe函数的实现"></a>platform设备probe函数的实现</h2><p>将步进电机做为platform设备挂载到platform总线上，最重要的步骤就是实现步进电机platform 驱动的probe函数。通过设备树文件中stepper_motor节点的compatible属性，platform总线可以自动将步进电机驱动match到该设备节点，从而调用驱动的probe函数，在probe函数中需要完成设备节点的解析，获取和分配设备需要的各种资源并对设备进行初始化。</p>
+<p>针对上面的设备树文件，可以编写步进电机驱动的probe函数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">stepper_motor_probe</span><span class="params">(<span class="keyword">struct</span> platform_device *pdev)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">int</span> ret;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">stepper_motor_platform</span> *<span class="title">plat</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">device_node</span> *<span class="title">np</span>, *<span class="title">pp</span>;</span></span><br><span class="line">    <span class="type">int</span> n_stepper_motors;</span><br><span class="line">    <span class="type">unsigned</span> <span class="type">int</span> stepper_motor_major;</span><br><span class="line">    <span class="type">int</span> i;</span><br><span class="line">    <span class="type">dev_t</span> devno;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 获取设备树节点 */</span></span><br><span class="line">    np = pdev-&gt;dev.of_node;</span><br><span class="line">    printk(<span class="string">&quot;probe stepper motor!\n&quot;</span>);</span><br><span class="line">	</span><br><span class="line">    <span class="comment">/* 获取挂在的步进电机的个数(字节点个数) */</span></span><br><span class="line">    n_stepper_motors = of_get_child_count(np);</span><br><span class="line">    <span class="keyword">if</span> (n_stepper_motors == <span class="number">0</span>) &#123;</span><br><span class="line">        printk(<span class="string">&quot;no device node!\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> -ENODEV;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 申请总线设备结构体内存并初始化 */</span></span><br><span class="line">    plat = devm_kzalloc(&amp;pdev-&gt;dev, <span class="keyword">sizeof</span>(<span class="keyword">struct</span> stepper_motor_platform), GFP_KERNEL);</span><br><span class="line">    <span class="keyword">if</span> (!plat)</span><br><span class="line">        <span class="keyword">return</span> -ENOMEM;</span><br><span class="line">    plat-&gt;count = n_stepper_motors;</span><br><span class="line">    plat-&gt;pdev = pdev;</span><br><span class="line">	</span><br><span class="line">    <span class="comment">/* 申请步进电机设备结构体内存 */</span></span><br><span class="line">    stepper_motor_devp = kzalloc(n_stepper_motors * <span class="keyword">sizeof</span>(<span class="keyword">struct</span> stepper_motor_device), GFP_KERNEL);</span><br><span class="line">    <span class="keyword">if</span> (!stepper_motor_devp) &#123;</span><br><span class="line">        printk(<span class="string">&quot;stepper motor: failed to alloc stepper motor.\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> -ENOMEM;</span><br><span class="line">    &#125;       </span><br><span class="line">    plat-&gt;data = stepper_motor_devp;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 保存设备结构体指针，在释放设备时需要使用 */</span></span><br><span class="line">    platform_set_drvdata(pdev, plat);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 将每一个步进电机注册为字符设备 */</span></span><br><span class="line">    <span class="comment">/* 申请字符设备号 */</span></span><br><span class="line">    ret = alloc_chrdev_region(&amp;devno, <span class="number">0</span>, n_stepper_motors, STEPPER_MOTOR_NAME);</span><br><span class="line">    stepper_motor_major = MAJOR(devno);</span><br><span class="line">    <span class="keyword">if</span> (ret &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        dev_err(&amp;pdev-&gt;dev, <span class="string">&quot;Failed to allocate chrdev region\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> ret;</span><br><span class="line">    &#125;    </span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; n_stepper_motors; i++) &#123;</span><br><span class="line">        <span class="class"><span class="keyword">struct</span> <span class="title">stepper_motor_device</span> *<span class="title">devp</span>;</span>       </span><br><span class="line">        devp = &amp;(stepper_motor_devp[i]);</span><br><span class="line">        devp-&gt;devno = MKDEV(stepper_motor_major, i);</span><br><span class="line">        stepper_motor_setup(devp, i);			<span class="comment">// 注册为字符设备</span></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/* 根据设备树中的步进电机节点信息申请和分配相应的资源 */</span></span><br><span class="line">    i = <span class="number">0</span>;</span><br><span class="line">    for_each_child_of_node(np, pp) &#123;</span><br><span class="line">        stepper_motor_get_data(&amp;(stepper_motor_devp[i]), pp);	<span class="comment">// 根据字节点信息配置设备</span></span><br><span class="line">        i++;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    dev_info(&amp;pdev-&gt;dev, <span class="string">&quot;stepper motor driver initialized\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="步进电机字符设备文件操作接口的实现"><a href="#步进电机字符设备文件操作接口的实现" class="headerlink" title="步进电机字符设备文件操作接口的实现"></a>步进电机字符设备文件操作接口的实现</h2><p>前面在功能需求中提到了，步进电机的驱动程序需要提供如下操作函数接口：</p>
+<ol>
+<li>向前运动指定步数</li>
+<li>向后运动指定步数</li>
+<li>停止运动</li>
+</ol>
+<p>步进电机控制实现的逻辑很简单，控制步进电机运动时，只要将步进电机的使能GPIO设置为有效电平，将方向GPIO按照指定方向设置高低电平，然后使能PWM模块输出脉冲。延时指定步数的PWM脉冲周期即可。</p>
+<p>当然，下面的驱动程序中使用阻塞的方式等待步进电机运动完指定的步数，在步进电机运动过程中其实是无法停止的。其实可以采用非阻塞的方式去实现，而不用在驱动程序中去等待， 下次再写了。 </p>
+<p>通过字符设备的文件操作接口，ioctl即可实现以上三个功能，ioctl函数实现如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 按照ioctl的规范定义我们需要实现的操作对应的命令 */</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> STEPPER_IOC_MAGIC               <span class="string">&#x27;s&#x27;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> STEPPER_MOTOR_CMD_STOP          _IO(STEPPER_IOC_MAGIC, 0)</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> STEPPER_MOTOR_CMD_FORWARD       _IOW(STEPPER_IOC_MAGIC, 1, int)</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> STEPPER_MOTOR_CMD_BACKWARD      _IOW(STEPPER_IOC_MAGIC, 2, int)</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">/* 实现步进电机按照指定方向运动指定步数 */</span></span><br><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">stepper_motor_run</span><span class="params">(<span class="keyword">struct</span> stepper_motor_device *dev, <span class="type">unsigned</span> <span class="type">int</span> dir, <span class="type">unsigned</span> <span class="type">long</span> nsteps)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">unsigned</span> <span class="type">long</span> delay_time_us;</span><br><span class="line">    <span class="type">unsigned</span> <span class="type">long</span> delay_time_ms;</span><br><span class="line">    </span><br><span class="line">    gpiod_set_value(dev-&gt;direction_gpio, dir);</span><br><span class="line">    gpiod_set_value(dev-&gt;enable_gpio, STEPPER_MOTOR_ENABLE);</span><br><span class="line">    pwm_config(dev-&gt;pwm, PWM_DUTY_NS, PWM_DUTY_NS * <span class="number">2</span>);</span><br><span class="line">        </span><br><span class="line">    delay_time_us = PWM_DUTY_NS / <span class="number">1000</span> * nstpes;</span><br><span class="line">    <span class="keyword">if</span> (delay_time_us &gt; <span class="number">5000</span>) &#123;</span><br><span class="line">        delay_time_ms = delay_time_us / <span class="number">1000</span>;</span><br><span class="line">        delay_time_us = delay_time_us - delay_time_ms * <span class="number">1000</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    pwm_enable(dev-&gt;pwm);</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (delay_time_ms &gt; <span class="number">0</span>)</span><br><span class="line">        msleep(delay_time_ms);</span><br><span class="line">    <span class="keyword">if</span> (delay_time_us &gt; <span class="number">0</span>)</span><br><span class="line">        udelay(delay_time_us);</span><br><span class="line">    </span><br><span class="line">    pwm_disable(dev-&gt;pwm);</span><br><span class="line"></span><br><span class="line">    gpiod_set_value(dev-&gt;enable_gpio, STEPPER_MOTOR_DISABLE);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 停止步进电机运动 */</span></span><br><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">stepper_motor_stop</span><span class="params">(<span class="keyword">struct</span> stepper_motor_device *dev)</span></span><br><span class="line">&#123;</span><br><span class="line">    pwm_disable(dev-&gt;pwm);</span><br><span class="line">    gpiod_set_value(dev-&gt;enable_gpio, STEPPER_MOTOR_DISABLE);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 字符设备驱动的ioctl函数实现 */</span></span><br><span class="line"><span class="type">static</span> <span class="type">long</span> <span class="title function_">stepper_motor_ioctl</span><span class="params">(<span class="keyword">struct</span> file *filp, <span class="type">unsigned</span> <span class="type">int</span> cmd, <span class="type">unsigned</span> <span class="type">long</span> arg)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">stepper_motor_device</span> *<span class="title">dev</span> =</span> filp-&gt;private_data;</span><br><span class="line">    <span class="type">int</span> ret = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">switch</span> (cmd) &#123;</span><br><span class="line">    <span class="keyword">case</span> STEPPER_MOTOR_CMD_STOP:</span><br><span class="line">        stepper_motor_stop(dev);</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> STEPPER_MOTOR_CMD_FORWARD:</span><br><span class="line">        stepper_motor_run(dev, STEPPER_MOTOR_DIR_FORWARD, arg);</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> STEPPER_MOTOR_CMD_BACKWARD:</span><br><span class="line">        stepper_motor_run(dev, STEPPER_MOTOR_DIR_BACKWARD, arg);</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">default</span>:</span><br><span class="line">        <span class="keyword">return</span> -EINVAL;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里需要注意的有两点：</p>
+<ol>
+<li>由于需要支持同时驱动多个步进电机设备，因此需要在ioctl中获取到设备文件对应的步进电机设备结构体。一般驱动程序都会把设备结构体作为设备文件的private_data，这样在设备文件的操作函数中就可以获取到设备对应的设备结构体了。因此在实现步进电机的open函数时，需要将驱动中定义的步进电机设备结构体绑定到文件的private_data。如下所示：</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">stepper_motor_open</span><span class="params">(<span class="keyword">struct</span> inode *inode, <span class="keyword">struct</span> file *filp)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">/* 根据文件inode节点获取到对应设备驱动中的设备结构体 */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">stepper_motor_device</span> *<span class="title">dev</span> =</span> container_of(inode-&gt;i_cdev, <span class="keyword">struct</span> stepper_motor_device, cdev);</span><br><span class="line">    filp-&gt;private_data = dev;</span><br><span class="line">    printk(<span class="string">&quot;open stepper motor%d\n&quot;</span>, MINOR(dev-&gt;devno));</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>ioctl的控制命令的定义不要随便define，要按照ioctl接口的规范去定义，可以直接通过Linux提供的ioctl命令定义宏来很方便的定义不同类型的命令，如前面程序中用到的_IO, _IOW宏 。具体的ioctl命令定义规范可以查看相关文档资料。</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Embeded-software/" rel="tag"># Embeded software</a>
+              <a href="/tags/Linux-Driver/" rel="tag"># Linux Driver</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/19/Virtual-Keyboard-in-Qt5/" rel="prev" title="树莓派qt5使用虚拟键盘配置">
+                  <i class="fa fa-angle-left"></i> 树莓派qt5使用虚拟键盘配置
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/09/17/Makefile-Learning-Notes/" rel="next" title="Makefile Learning Notes">
+                  Makefile Learning Notes <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2025</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Ran</span>
+  </div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="Back to top">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+  <a href="https://github.com/ranfang66" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>
