@@ -4,10 +4,10 @@
 
 # Site
 title: KissFire
-subtitle: 'A blog of RanFang to record life and share technology.'
-description: 'A personal blog of RanFang to record life and share technology.'
-keywords: IT, programming, coding, life, embedded, linux
-author: Ran Fang
+subtitle: 'A blog to record daily life and share development notes.'
+description: 'A personal blog to record daily life and share development notes.'
+keywords: programming, coding, daily life, embedded software, linux
+author: Ran
 language: en
 timezone: 'Asia/Shanghai'
 
@@ -41,7 +41,11 @@ external_link:
   exclude: ''
 filename_case: 0
 render_drafts: false
-post_asset_folder: false
+post_asset_folder: true
+marked:
+  prependRoot: true
+  postAsset: true
+
 relative_link: false
 future: true
 syntax_highlighter: highlight.js
